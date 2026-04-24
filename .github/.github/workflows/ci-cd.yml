@@ -1,0 +1,184 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  AIU — GitHub Actions CI/CD
+#  Triggers: push to main → lint → test → deploy
+#  Supports: Render, Railway, VPS (Docker SSH)
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION:   "20"
+
+jobs:
+
+  # ── 1. Lint Backend ────────────────────────────────────────────────────────
+  lint-backend:
+    name: Lint Backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install ruff==0.5.0 bandit==1.7.9
+      - run: ruff check backend/
+      - run: ruff format --check backend/
+      - run: bandit -r backend/apps/ -ll -ii
+
+  # ── 2. Lint Frontend ───────────────────────────────────────────────────────
+  lint-frontend:
+    name: Lint Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --prefix frontend
+      - run: npm run lint --prefix frontend
+
+  # ── 3. Test Backend ────────────────────────────────────────────────────────
+  test-backend:
+    name: Test Backend
+    runs-on: ubuntu-latest
+    needs: lint-backend
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB:       aiu_test
+          POSTGRES_USER:     aiu_user
+          POSTGRES_PASSWORD: test_password
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7.2-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DJANGO_SETTINGS_MODULE:  config.settings.development
+      DJANGO_SECRET_KEY:       ci-test-secret-key-minimum-50-chars-long-here
+      JWT_SIGNING_KEY:         ci-jwt-key-minimum-50-chars-long-for-testing
+      FIELD_ENCRYPTION_KEY:    hQOxFyoHr_7oOdHNWIELQVY-J0BCRdpwYDANR7MRFCU=
+      DATABASE_URL:            postgresql://aiu_user:test_password@localhost:5432/aiu_test
+      REDIS_URL:               redis://localhost:6379/0
+      CELERY_BROKER_URL:       redis://localhost:6379/1
+      CELERY_RESULT_BACKEND:   redis://localhost:6379/2
+      OPENAI_API_KEY:          sk-test-fake-key-for-ci
+      ANTHROPIC_API_KEY:       sk-ant-test-fake-key
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -r backend/requirements.txt -r backend/requirements-dev.txt
+      - working-directory: backend
+        run: python manage.py migrate --noinput
+      - working-directory: backend
+        run: |
+          pytest tests/ \
+            --cov=apps \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            --cov-fail-under=60 \
+            -v
+      - uses: codecov/codecov-action@v4
+        with:
+          file: backend/coverage.xml
+          flags: backend
+
+  # ── 4. Test Frontend ───────────────────────────────────────────────────────
+  test-frontend:
+    name: Test Frontend
+    runs-on: ubuntu-latest
+    needs: lint-frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --prefix frontend
+      - run: npm test --prefix frontend -- --watchAll=false --passWithNoTests
+
+  # ── 5A. Deploy to Render (auto-deploy via push) ────────────────────────────
+  # Render watches your GitHub repo and deploys automatically on push to main.
+  # No GitHub Actions step needed — Render handles it.
+  # Just connect your repo at: render.com → New → Blueprint → select repo
+
+  # ── 5B. Deploy to Railway (via Railway CLI) ────────────────────────────────
+  deploy-railway:
+    name: Deploy to Railway
+    runs-on: ubuntu-latest
+    needs: [test-backend, test-frontend]
+    if: |
+      github.ref == 'refs/heads/main' &&
+      github.event_name == 'push' &&
+      vars.DEPLOY_TARGET == 'railway'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+      - name: Deploy backend
+        run: railway up --service aiu-backend
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      - name: Deploy worker
+        run: railway up --service aiu-worker
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+  # ── 5C. Deploy to VPS via Docker SSH ──────────────────────────────────────
+  deploy-vps:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+    needs: [test-backend, test-frontend]
+    if: |
+      github.ref == 'refs/heads/main' &&
+      github.event_name == 'push' &&
+      vars.DEPLOY_TARGET == 'vps'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host:     ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key:      ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -e
+            cd /opt/aiu
+            git pull origin main
+            docker compose build backend frontend
+            docker compose up -d --no-deps --scale backend=2 backend
+            sleep 15
+            docker compose up -d --no-deps --scale backend=1 backend
+            docker compose up -d --no-deps frontend worker beat
+            docker compose exec -T backend python manage.py migrate --noinput
+            docker image prune -f
+            echo "✓ Deploy complete: $(date)"

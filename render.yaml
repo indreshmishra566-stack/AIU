@@ -1,0 +1,162 @@
+# AIU — Render Blueprint
+# Deploy the Django API, Postgres, Redis-compatible Key Value, Celery worker, and beat.
+# Frontend is deployed separately to Vercel from ./frontend.
+
+databases:
+  - name: aiu-postgres
+    databaseName: aiu_db
+    user: aiu_user
+
+services:
+  - type: keyvalue
+    name: aiu-redis
+    ipAllowList: []
+
+  - type: web
+    name: aiu-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /api/v1/health/
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings.production
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: JWT_SIGNING_KEY
+        generateValue: true
+      - key: FIELD_ENCRYPTION_KEY
+        sync: false           # generate: python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+      - key: DJANGO_DEBUG
+        value: "False"
+      - key: DJANGO_ALLOWED_HOSTS
+        value: ".onrender.com"
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: aiu-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: aiu-redis
+          type: keyvalue
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          name: aiu-redis
+          type: keyvalue
+          property: connectionString
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          name: aiu-redis
+          type: keyvalue
+          property: connectionString
+      - key: GROQ_API_KEY
+        sync: false
+      - key: LLM_PROVIDER
+        value: groq
+      - key: LLM_MODEL
+        value: llama3-70b-8192
+      - key: LLM_EMBEDDING_MODEL
+        value: local
+      - key: RATE_LIMIT_ANON
+        value: "100/hour"
+      - key: RATE_LIMIT_USER
+        value: "1000/hour"
+      - key: RATE_LIMIT_AI
+        value: "60/hour"
+      - key: PROMETHEUS_MULTIPROC_DIR
+        value: /tmp/prometheus
+
+  - type: worker
+    name: aiu-worker
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    dockerCommand: celery -A config.celery worker --loglevel=info --concurrency=1 --queues=embeddings,ai_processing,analytics,celery
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings.production
+      - key: DJANGO_SECRET_KEY
+        fromService:
+          name: aiu-backend
+          type: web
+          envVarKey: DJANGO_SECRET_KEY
+      - key: JWT_SIGNING_KEY
+        fromService:
+          name: aiu-backend
+          type: web
+          envVarKey: JWT_SIGNING_KEY
+      - key: FIELD_ENCRYPTION_KEY
+        fromService:
+          name: aiu-backend
+          type: web
+          envVarKey: FIELD_ENCRYPTION_KEY
+      - key: DATABASE_URL
+        fromDatabase:
+          name: aiu-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: aiu-redis
+          type: keyvalue
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          name: aiu-redis
+          type: keyvalue
+          property: connectionString
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          name: aiu-redis
+          type: keyvalue
+          property: connectionString
+      - key: GROQ_API_KEY
+        fromService:
+          name: aiu-backend
+          type: web
+          envVarKey: GROQ_API_KEY
+      - key: LLM_PROVIDER
+        value: groq
+      - key: LLM_MODEL
+        value: llama3-70b-8192
+
+  - type: worker
+    name: aiu-beat
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    dockerCommand: celery -A config.celery beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings.production
+      - key: DJANGO_SECRET_KEY
+        fromService:
+          name: aiu-backend
+          type: web
+          envVarKey: DJANGO_SECRET_KEY
+      - key: JWT_SIGNING_KEY
+        fromService:
+          name: aiu-backend
+          type: web
+          envVarKey: JWT_SIGNING_KEY
+      - key: FIELD_ENCRYPTION_KEY
+        fromService:
+          name: aiu-backend
+          type: web
+          envVarKey: FIELD_ENCRYPTION_KEY
+      - key: DATABASE_URL
+        fromDatabase:
+          name: aiu-postgres
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          name: aiu-redis
+          type: keyvalue
+          property: connectionString
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          name: aiu-redis
+          type: keyvalue
+          property: connectionString

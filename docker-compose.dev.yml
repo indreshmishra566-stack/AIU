@@ -1,0 +1,79 @@
+# AIU — Development overrides
+
+services:
+
+  postgres:
+    ports:
+      - "5433:5432"
+
+  redis:
+    ports:
+      - "6380:6379"
+
+  # ── Backend: Django dev server with hot reload ─────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: >
+      sh -c "mkdir -p /tmp/prometheus &&
+      python manage.py migrate --noinput &&
+      python manage.py runserver 0.0.0.0:8000"
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.development
+      DJANGO_DEBUG: "True"
+      DJANGO_ALLOWED_HOSTS: "*"
+      PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus
+    volumes:
+      - ./backend:/app          # Live code mount — changes reflect immediately
+    ports:
+      - "8000:8000"             # Expose directly (no Nginx in dev)
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # ── Frontend: Vite dev server with HMR ────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    environment:
+      VITE_API_BASE_URL: "http://localhost:8000/api/v1"
+      VITE_WS_BASE_URL: "ws://localhost:8000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules        # Prevent host overwriting container node_modules
+    ports:
+      - "5173:5173"              # Vite dev port
+    command: npm run dev -- --host 0.0.0.0
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:5173 >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── Celery Worker: single-threaded for easy debugging ─────────────────────
+  worker:
+    command: >
+      celery -A config.celery worker
+        --loglevel=debug
+        --pool=solo
+        --queues=embeddings,ai_processing,analytics,celery
+    volumes:
+      - ./backend:/app
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.development
+      PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus
+
+  # ── Beat: same config, lighter ─────────────────────────────────────────────
+  beat:
+    profiles:
+      - workers
+    volumes:
+      - ./backend:/app
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.development
+      PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus

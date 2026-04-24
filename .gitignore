@@ -1,0 +1,52 @@
+# ── Secrets (NEVER commit) ────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# ── Python ─────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.so
+*.egg
+*.egg-info/
+.Python
+dist/
+build/
+.eggs/
+venv/
+env/
+.venv/
+
+# ── Django ─────────────────────────────────────────────────────────────────────
+*.log
+db.sqlite3
+staticfiles/
+media/
+local_settings.py
+
+# ── Testing ────────────────────────────────────────────────────────────────────
+.coverage
+htmlcov/
+.pytest_cache/
+coverage.xml
+
+# ── Node ───────────────────────────────────────────────────────────────────────
+node_modules/
+frontend/dist/
+frontend/.vite/
+*.tsbuildinfo
+npm-debug.log*
+
+# ── IDE ────────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# ── Certs ──────────────────────────────────────────────────────────────────────
+infra/certbot/
+*.pem
+*.key
+*.crt

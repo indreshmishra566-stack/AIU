@@ -1,0 +1,38 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  AIU — Prometheus Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: "aiu-production"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+scrape_configs:
+  # Django app metrics (django-prometheus)
+  - job_name: "aiu-backend"
+    static_configs:
+      - targets: ["backend:8000"]
+    metrics_path: "/metrics"
+    scrape_interval: 15s
+
+  # Redis metrics (if redis-exporter added)
+  - job_name: "redis"
+    static_configs:
+      - targets: ["redis:6379"]
+
+  # PostgreSQL metrics (if postgres-exporter added)
+  - job_name: "postgres"
+    static_configs:
+      - targets: ["postgres:5432"]
+
+  # Celery metrics via flower (optional)
+  - job_name: "celery"
+    static_configs:
+      - targets: ["worker:5555"]
+    metrics_path: "/metrics"
