@@ -129,8 +129,14 @@ export default function ChatPage() {
     try {
       abortRef.current = new AbortController();
 
+      const apiBase = (
+        (import.meta as any).env?.VITE_API_URL ||
+        (import.meta as any).env?.VITE_API_BASE_URL ||
+        "http://localhost:8000/api/v1"
+      ).replace(/\/+$/, "");
+
       const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1"}/ai/chat/`,
+        `${apiBase}/ai/chat/`,
         {
           method: "POST",
           headers: {

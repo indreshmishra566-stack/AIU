@@ -35,8 +35,14 @@ export function useChat({ conversationId, coachMode = "friendly" }: UseChatOptio
 
   const abortRef = useRef<AbortController | null>(null);
 
-  const getApiBase = () =>
-    import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1";
+  const getApiBase = () => {
+    const env = (import.meta as any).env || {};
+    const base =
+      env.VITE_API_URL ||
+      env.VITE_API_BASE_URL ||
+      "http://localhost:8000/api/v1";
+    return base.replace(/\/+$/, "");
+  };
 
   const sendMessage = useCallback(
     async (input: string, extraContext?: Record<string, unknown>) => {
