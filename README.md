@@ -1,95 +1,93 @@
-# AIU
+# 🚀 AIU — Adaptive Intelligence Unit
 
-AIU is a monorepo with:
 
-- `backend/`: Django API and Celery services
-- `frontend/`: Vite + React app
-- `render.yaml`: Render blueprint for backend infrastructure
-- `frontend/vercel.json`: Vercel config for the frontend SPA
+AIU is a full-stack system designed to build persistent memory from user interactions and enable context-aware, intelligent behavior over time.
+Live Demo : https://aiu-pi.vercel.app/
 
-## Recommended deployment path
 
-This repo is set up for:
+## 📌 What is AIU?
 
-1. GitHub for source control
-2. Render for backend, Postgres, Redis-compatible Key Value, worker, and beat
-3. Vercel for the frontend
+AIU (Adaptive Intelligence Unit) is an AI-driven system that goes beyond traditional stateless applications.
 
-## 1. Push to GitHub
+Instead of responding in isolation, AIU:
 
-```bash
-git init
-git add .
-git commit -m "Initial commit"
-git branch -M main
-git remote add origin https://github.com/YOUR_NAME/aiu.git
-git push -u origin main
-```
+- Remembers past interactions  
+- Learns behavioral patterns  
+- Adapts responses over time  
 
-## 2. Deploy backend on Render
+It is designed as a **context-aware intelligence layer**, not just a chatbot.
 
-Render docs: https://render.com/docs/blueprint-spec
+---
 
-1. In Render, choose `New` → `Blueprint`.
-2. Connect your GitHub repo.
-3. Render will detect [render.yaml](/home/imim/Downloads/aiu/render.yaml).
-4. Create the stack.
-5. When prompted for secrets, set:
+## ⚡ Problem It Solves
 
-```text
-FIELD_ENCRYPTION_KEY=...
-GROQ_API_KEY=...
-CORS_ALLOWED_ORIGINS=https://YOUR-FRONTEND.vercel.app
-```
+Most systems today are stateless:
 
-6. After the backend web service is live, copy its public URL, for example:
+- ❌ No memory of past interactions  
+- ❌ No personalization  
+- ❌ No behavioral understanding  
 
-```text
-https://aiu-backend.onrender.com
-```
+AIU solves this by introducing:
 
-## 3. Deploy frontend on Vercel
+- 🧠 Persistent memory  
+- 🔁 Context continuity  
+- 📊 Behavior-driven responses  
 
-Vercel Vite docs: https://vercel.com/docs/frameworks/frontend/vite
+---
 
-1. In Vercel, import the same GitHub repo.
-2. Set the project root directory to `frontend`.
-3. Add these environment variables in Vercel:
+## 🧠 How It Works
 
-```text
-VITE_API_BASE_URL=https://YOUR-RENDER-BACKEND.onrender.com/api/v1
-VITE_WS_BASE_URL=wss://YOUR-RENDER-BACKEND.onrender.com
-```
+User Interaction → Memory Storage → Context Processing → Intelligent Response
 
-4. Deploy.
+1. User interacts with the system  
+2. Data is stored and structured as memory  
+3. System processes context from past + present  
+4. Generates adaptive, context-aware output  
 
-## 4. Update backend CORS
+---
 
-After Vercel gives you your frontend domain, update Render:
+## ✨ Key Features
 
-```text
-CORS_ALLOWED_ORIGINS=https://YOUR-PROJECT.vercel.app
-```
+- 🧠 Persistent memory system  
+- 🔄 Context-aware decision making  
+- ⚡ Real-time interaction handling  
+- 📡 API-driven architecture  
+- 🔁 Continuous learning from interactions  
 
-If you add a custom domain later, include that too as a comma-separated list.
+---
 
-## Local development
+## 🛠️ Tech Stack
 
-### Docker-first
+Frontend: React (Vite)  
+Backend: Django + Django REST Framework  
+Async Processing: Celery  
+Database: PostgreSQL  
+Cache / Queue: Redis (Render Key Value)  
+Deployment: Render + Vercel + Docker  
 
-```bash
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up backend frontend postgres redis
-```
+---
 
-### Python + Vite
+## 🧩 System Design
 
-1. Copy `.env.example` to `.env`.
-2. Install backend dependencies into `.venv`.
-3. Install frontend dependencies in `frontend/`.
-4. Start backend and frontend separately.
+- Backend handles memory, logic, and APIs  
+- Workers process background intelligence tasks  
+- Frontend provides interaction interface  
+- System evolves based on stored context  
 
-## Notes
+---
 
-- Render background workers are not on the `free` instance type in current Render docs, so the blueprint does not force `free` plans for workers.
-- Render now documents `keyvalue` as the preferred Redis-compatible service type, so the blueprint uses that instead of the deprecated `redis` alias.
-- The frontend is no longer defined in `render.yaml`, because this repo is now set up for Vercel on the frontend side.
+## 🎯 Why This Project Matters
+
+AIU demonstrates:
+
+- Building stateful AI systems  
+- Designing memory-driven architectures  
+- Real-world backend system design  
+- Integration of AI concepts into production systems  
+
+---
+
+## Developer
+
+Amareesh Mishra
+Indresh Mishra
