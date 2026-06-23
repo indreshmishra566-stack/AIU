@@ -12,7 +12,7 @@ function getSystemPreference(): "light" | "dark" {
 }
 
 function getStoredTheme(): Theme {
-  return (localStorage.getItem("aiu-theme") as Theme) ?? "system";
+  return (localStorage.getItem("aiu-theme") as Theme) ?? "dark";
 }
 
 function applyTheme(theme: Theme) {

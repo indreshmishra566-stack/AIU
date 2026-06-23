@@ -11,10 +11,11 @@ import TextareaAutosize from "react-textarea-autosize";
 import toast from "react-hot-toast";
 import {
   Send, Plus, Trash2, Brain, ChevronDown,
-  Zap, BookOpen, Shield, BarChart2, Loader2,
+  Zap, BookOpen, Shield, BarChart2, Loader2, Sparkles, Paperclip, Mic,
 } from "lucide-react";
 import { api } from "../services/apiClient";
 import { useAuthStore } from "../store/authStore";
+import { ThemeToggle } from "../components/ui/ThemeToggle";
 import { formatDistanceToNow } from "date-fns";
 import clsx from "clsx";
 
@@ -228,16 +229,16 @@ export default function ChatPage() {
   const currentMode = COACH_MODES.find((m) => m.value === coachMode) || COACH_MODES[0];
 
   return (
-    <div className="flex h-full overflow-hidden bg-gray-50 dark:bg-gray-950">
+    <div className="flex h-screen overflow-hidden bg-neutral-50 dark:bg-black">
 
       {/* ── Conversation Sidebar ───────────────────────────────────────────── */}
       {isAuthenticated && (
-      <aside className="hidden lg:flex flex-col w-64 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shrink-0">
-        <div className="p-4 border-b border-gray-200 dark:border-gray-800">
+      <aside className="hidden lg:flex flex-col w-64 border-r border-gray-200 dark:border-neutral-900 bg-white dark:bg-black shrink-0">
+        <div className="p-4 border-b border-gray-200 dark:border-neutral-900">
           <button
             onClick={startNew}
             className="w-full flex items-center gap-2 px-3 py-2 rounded-lg
-                       bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium
+                       bg-white text-black hover:bg-neutral-200 dark:bg-white dark:hover:bg-neutral-200 text-sm font-semibold
                        transition-colors"
           >
             <Plus size={16} />
@@ -256,8 +257,8 @@ export default function ChatPage() {
               className={clsx(
                 "w-full text-left px-3 py-2.5 rounded-lg mb-1 group transition-colors",
                 conv.id === currentConvId
-                  ? "bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300"
-                  : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
+                  ? "bg-gray-100 dark:bg-neutral-900 text-gray-900 dark:text-white"
+                  : "hover:bg-gray-100 dark:hover:bg-neutral-900 text-gray-700 dark:text-neutral-400"
               )}
             >
               <div className="flex items-start justify-between gap-2">
@@ -281,7 +282,7 @@ export default function ChatPage() {
                 <div className="flex gap-1 mt-1.5 flex-wrap">
                   {conv.topics.slice(0, 2).map((t) => (
                     <span key={t} className="text-[10px] px-1.5 py-0.5 rounded-full
-                                             bg-gray-100 dark:bg-gray-800 text-gray-500">
+                                             bg-gray-100 dark:bg-neutral-900 text-gray-500">
                       {t}
                     </span>
                   ))}
@@ -297,11 +298,10 @@ export default function ChatPage() {
       <div className="flex flex-col flex-1 min-w-0">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b
-                        border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+        <div className="flex items-center justify-between px-6 py-4 bg-white dark:bg-black">
           <div className="flex items-center gap-3">
-            <Brain size={20} className="text-violet-500" />
-            <span className="font-semibold text-gray-900 dark:text-gray-100">
+            <Brain size={23} className="text-gray-900 dark:text-white" />
+            <span className="sr-only">
               AIU Chat
             </span>
             {currentConvId && (
@@ -312,20 +312,27 @@ export default function ChatPage() {
           </div>
 
           <div className="flex items-center gap-2">
+            <Link
+              to="/chat"
+              className="hidden sm:inline-flex px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-neutral-200"
+            >
+              AIU
+            </Link>
+            <ThemeToggle />
             {!isAuthenticated && (
               <div className="hidden sm:flex items-center gap-2 mr-2">
                 <Link
                   to="/login"
-                  className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-700
-                             dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800
+                  className="px-4 py-2 rounded-full text-sm font-semibold text-gray-700
+                             dark:text-white border border-gray-200 dark:border-neutral-800 hover:bg-gray-100 dark:hover:bg-neutral-950
                              transition-colors"
                 >
                   Sign in
                 </Link>
                 <Link
                   to="/register"
-                  className="px-3 py-1.5 rounded-lg text-sm font-medium bg-violet-600
-                             hover:bg-violet-700 text-white transition-colors"
+                  className="px-4 py-2 rounded-full text-sm font-semibold bg-gray-900 text-white
+                             hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200 transition-colors"
                 >
                   Sign up
                 </Link>
@@ -333,13 +340,13 @@ export default function ChatPage() {
             )}
 
           {/* Coach Mode Selector */}
-          <div className="relative">
+          <div className="relative hidden sm:block">
             <button
               onClick={() => setShowModeMenu(!showModeMenu)}
               className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm
-                         border border-gray-200 dark:border-gray-700
-                         hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors
-                         text-gray-700 dark:text-gray-300"
+                         border border-gray-200 dark:border-neutral-800
+                         hover:bg-gray-50 dark:hover:bg-neutral-950 transition-colors
+                         text-gray-700 dark:text-neutral-300"
             >
               <currentMode.icon size={14} />
               <span className="hidden sm:inline">{currentMode.label}</span>
@@ -350,7 +357,7 @@ export default function ChatPage() {
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setShowModeMenu(false)} />
                 <div className="absolute right-0 top-full mt-1 w-52 rounded-xl shadow-lg
-                                bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700
+                                bg-white dark:bg-neutral-950 border border-gray-200 dark:border-neutral-800
                                 z-20 overflow-hidden">
                   {COACH_MODES.map((mode) => (
                     <button
@@ -358,13 +365,13 @@ export default function ChatPage() {
                       onClick={() => { setCoachMode(mode.value); setShowModeMenu(false); }}
                       className={clsx(
                         "w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-gray-50",
-                        "dark:hover:bg-gray-800 transition-colors",
-                        coachMode === mode.value && "bg-violet-50 dark:bg-violet-900/20"
+                        "dark:hover:bg-neutral-900 transition-colors",
+                        coachMode === mode.value && "bg-gray-50 dark:bg-neutral-900"
                       )}
                     >
                       <mode.icon size={16} className={clsx(
                         "mt-0.5 shrink-0",
-                        coachMode === mode.value ? "text-violet-600" : "text-gray-400"
+                        coachMode === mode.value ? "text-gray-900 dark:text-white" : "text-gray-400"
                       )} />
                       <div>
                         <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
@@ -428,45 +435,66 @@ export default function ChatPage() {
         </div>
 
         {/* Input Area */}
-        <div className="p-4 border-t border-gray-200 dark:border-gray-800
-                        bg-white dark:bg-gray-900">
-          <div className="flex items-end gap-3 max-w-4xl mx-auto">
-            <div className="flex-1 relative">
+        <div className="px-4 pb-8 bg-white dark:bg-black">
+          <div className="max-w-3xl mx-auto">
+            <div className="relative rounded-[28px] border border-gray-200 dark:border-neutral-800 bg-gray-100 dark:bg-neutral-900 shadow-sm">
               <TextareaAutosize
                 ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={`Message your AI (${currentMode.label} mode)…`}
-                className="w-full resize-none rounded-xl border border-gray-300 dark:border-gray-700
-                           bg-gray-50 dark:bg-gray-800 px-4 py-3 pr-12
+                placeholder="How can I help you today?"
+                className="w-full resize-none rounded-[28px] border-0
+                           bg-transparent px-6 py-5 pr-16
                            text-sm text-gray-900 dark:text-gray-100
-                           placeholder:text-gray-400
-                           focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent
+                           placeholder:text-slate-500 dark:placeholder:text-slate-500
+                           focus:outline-none focus:ring-0
                            max-h-48 transition-colors"
                 maxRows={8}
                 minRows={1}
                 disabled={isStreaming}
               />
+              <div className="flex items-center justify-between px-5 pb-4">
+                <div className="flex items-center gap-3 text-gray-500 dark:text-neutral-400">
+                  <button title="Attach file" className="p-1 hover:text-gray-900 dark:hover:text-white transition-colors">
+                    <Paperclip size={18} />
+                  </button>
+                  <button title="Voice input" className="p-1 hover:text-gray-900 dark:hover:text-white transition-colors">
+                    <Mic size={18} />
+                  </button>
+                </div>
+                <button
+                  onClick={sendMessage}
+                  disabled={!input.trim() || isStreaming}
+                  className="flex items-center justify-center w-10 h-10 rounded-full
+                             bg-gray-300 text-gray-700 hover:bg-gray-400 dark:bg-neutral-500 dark:text-black dark:hover:bg-neutral-300 disabled:opacity-60
+                             disabled:cursor-not-allowed transition-colors shrink-0"
+                  title="Send"
+                >
+                  {isStreaming
+                    ? <Loader2 size={16} className="animate-spin" />
+                    : <Send size={18} />
+                  }
+                </button>
+              </div>
             </div>
-
-            <button
-              onClick={sendMessage}
-              disabled={!input.trim() || isStreaming}
-              className="flex items-center justify-center w-10 h-10 rounded-xl
-                         bg-violet-600 hover:bg-violet-700 disabled:opacity-40
-                         disabled:cursor-not-allowed text-white transition-colors shrink-0"
-            >
-              {isStreaming
-                ? <Loader2 size={16} className="animate-spin" />
-                : <Send size={16} />
-              }
-            </button>
           </div>
-          <p className="text-center text-xs text-gray-400 mt-2">
-            Enter to send · Shift+Enter for new line
-            {isAuthenticated ? " · Memories are active" : " · Sign in to save memory"}
-          </p>
+          <div className="mt-4 mx-auto flex w-fit items-center rounded-full border border-gray-200 dark:border-neutral-800 bg-gray-100 dark:bg-neutral-900 p-1">
+            {COACH_MODES.slice(0, 3).map((mode) => (
+              <button
+                key={mode.value}
+                onClick={() => setCoachMode(mode.value)}
+                className={clsx(
+                  "px-4 py-1.5 rounded-full text-xs font-semibold transition-colors",
+                  coachMode === mode.value
+                    ? "bg-white text-black shadow-sm"
+                    : "text-slate-500 hover:text-gray-900 dark:hover:text-white"
+                )}
+              >
+                {mode.value === "mentor" ? "Focused" : mode.value === "strict" ? "Direct" : mode.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>
@@ -593,53 +621,21 @@ function EmptyState({
   coachMode: typeof COACH_MODES[number];
   userName?: string;
 }) {
-  const prompts = [
-    "What should I focus on today?",
-    "Help me reflect on this week",
-    "I'm struggling with procrastination",
-    "What patterns have you noticed in me?",
-    "I want to set a new goal",
-    "Help me break down my goal into tasks",
-  ];
-
   return (
-    <div className="flex flex-col items-center justify-center h-full pt-12 px-4">
-      <div className="w-16 h-16 rounded-2xl bg-violet-100 dark:bg-violet-900/30
-                      flex items-center justify-center mb-4">
-        <Brain size={32} className="text-violet-600" />
+    <div className="flex flex-col items-center justify-end min-h-[34vh] px-4 pb-4">
+      <div className="flex items-center gap-4 text-gray-900 dark:text-white">
+        <Sparkles size={46} strokeWidth={2.25} />
+        <h1 className="text-5xl font-semibold tracking-normal">
+          AIU
+        </h1>
       </div>
-      <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
-        {userName ? `Hello, ${userName}` : "Start a conversation"}
-      </h3>
-      <p className="text-gray-500 text-sm text-center max-w-sm mb-8">
-        I'm in <strong>{coachMode.label}</strong> mode — {coachMode.desc.toLowerCase()}.
+      <p className="mt-4 max-w-sm text-center text-sm text-gray-500 dark:text-neutral-500">
+        {userName ? `Hi, ${userName}. ` : ""}
+        {coachMode.label} mode is ready.
         {userName
-          ? " I remember everything you've shared with me."
-          : " You can chat without an account; sign in to save memory."}
+          ? " Memories are active."
+          : " Sign in to save memory."}
       </p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-md">
-        {prompts.map((prompt) => (
-          <button
-            key={prompt}
-            className="text-left px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700
-                       hover:border-violet-300 hover:bg-violet-50 dark:hover:bg-violet-900/10
-                       text-sm text-gray-600 dark:text-gray-400 transition-colors"
-            onClick={() => {
-              const input = document.querySelector("textarea");
-              if (input) {
-                const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-                  HTMLTextAreaElement.prototype, "value"
-                )?.set;
-                nativeInputValueSetter?.call(input, prompt);
-                input.dispatchEvent(new Event("input", { bubbles: true }));
-                input.focus();
-              }
-            }}
-          >
-            {prompt}
-          </button>
-        ))}
-      </div>
     </div>
   );
 }
