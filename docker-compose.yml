@@ -1,0 +1,168 @@
+# AIU — Local Docker stack
+# Keeps local development focused on the app services only.
+
+x-backend-common: &backend-common
+  build:
+    context: ./backend
+    dockerfile: Dockerfile
+    target: runtime
+  env_file: .env
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  networks:
+    - aiu
+  restart: unless-stopped
+
+services:
+
+  # ── PostgreSQL ────────────────────────────────────────────────────────────
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: aiu_db
+      POSTGRES_USER: aiu_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-strong_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - aiu
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aiu_user -d aiu_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  # ── Redis ─────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7.2-alpine
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:-redis_password}
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save 60 1000
+      --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - aiu
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD:-redis_password}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 300m
+
+  # ── Backend API ───────────────────────────────────────────────────────────
+  backend:
+    <<: *backend-common
+    command: >
+      sh -c "
+        python manage.py migrate --noinput &&
+        python manage.py collectstatic --noinput &&
+        gunicorn
+          --worker-class uvicorn.workers.UvicornWorker
+          --workers 4
+          --bind 0.0.0.0:8000
+          --timeout 120
+          --keep-alive 5
+          --log-level info
+          --access-logfile -
+          --error-logfile -
+          config.asgi:application
+      "
+    expose:
+      - "8000"
+    volumes:
+      - static_files:/app/staticfiles
+      - media_files:/app/media
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512m
+
+  # ── Celery Worker (AI processing) ─────────────────────────────────────────
+  worker:
+    <<: *backend-common
+    command: >
+      celery -A config.celery worker
+        --loglevel=info
+        --concurrency=4
+        --queues=embeddings,ai_processing,analytics,celery
+        --max-tasks-per-child=100
+        --without-gossip
+        --without-mingle
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A config.celery inspect ping || exit 1"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  # ── Celery Beat (scheduled tasks) ─────────────────────────────────────────
+  beat:
+    <<: *backend-common
+    command: >
+      celery -A config.celery beat
+        --loglevel=info
+        --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  # ── Frontend ──────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+        VITE_WS_BASE_URL: ${VITE_WS_BASE_URL}
+    networks:
+      - aiu
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+networks:
+  aiu:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  static_files:
+  media_files:

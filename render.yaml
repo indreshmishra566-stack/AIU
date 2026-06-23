@@ -1,0 +1,142 @@
+# AIU — Render Blueprint
+# Deploy the Django API, Celery worker, and beat.
+# Database and Redis are provided through external environment variables
+# such as Neon DATABASE_URL and an existing Redis URL.
+# Frontend is deployed separately to Vercel from ./frontend.
+
+services:
+  - type: web
+    name: aiu-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /api/v1/health/
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings.production
+      - key: DJANGO_SECRET_KEY
+        sync: false
+      - key: JWT_SIGNING_KEY
+        sync: false
+      - key: FIELD_ENCRYPTION_KEY
+        sync: false           # generate: python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+      - key: DJANGO_DEBUG
+        value: "False"
+      - key: DJANGO_ALLOWED_HOSTS
+        value: ".onrender.com"
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: CORS_ALLOWED_ORIGIN_REGEXES
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: CELERY_BROKER_URL
+        sync: false
+      - key: CELERY_RESULT_BACKEND
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: LLM_MODEL
+        sync: false
+
+  - type: worker
+    name: aiu-worker
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    dockerCommand: celery -A config.celery worker --loglevel=info --concurrency=1 --queues=embeddings,ai_processing,analytics,celery
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings.production
+      - key: DJANGO_SECRET_KEY
+        fromService:
+          name: aiu-backend
+          type: web
+          envVarKey: DJANGO_SECRET_KEY
+      - key: JWT_SIGNING_KEY
+        fromService:
+          name: aiu-backend
+          type: web
+          envVarKey: JWT_SIGNING_KEY
+      - key: FIELD_ENCRYPTION_KEY
+        fromService:
+          name: aiu-backend
+          type: web
+          envVarKey: FIELD_ENCRYPTION_KEY
+      - key: DATABASE_URL
+        fromService:
+          name: aiu-backend
+          type: web
+          envVarKey: DATABASE_URL
+      - key: REDIS_URL
+        fromService:
+          name: aiu-backend
+          type: web
+          envVarKey: REDIS_URL
+      - key: CELERY_BROKER_URL
+        fromService:
+          name: aiu-backend
+          type: web
+          envVarKey: CELERY_BROKER_URL
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          name: aiu-backend
+          type: web
+          envVarKey: CELERY_RESULT_BACKEND
+      - key: GROQ_API_KEY
+        fromService:
+          name: aiu-backend
+          type: web
+          envVarKey: GROQ_API_KEY
+      - key: LLM_MODEL
+        fromService:
+          name: aiu-backend
+          type: web
+          envVarKey: LLM_MODEL
+
+  - type: worker
+    name: aiu-beat
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    dockerCommand: celery -A config.celery beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings.production
+      - key: DJANGO_SECRET_KEY
+        fromService:
+          name: aiu-backend
+          type: web
+          envVarKey: DJANGO_SECRET_KEY
+      - key: JWT_SIGNING_KEY
+        fromService:
+          name: aiu-backend
+          type: web
+          envVarKey: JWT_SIGNING_KEY
+      - key: FIELD_ENCRYPTION_KEY
+        fromService:
+          name: aiu-backend
+          type: web
+          envVarKey: FIELD_ENCRYPTION_KEY
+      - key: DATABASE_URL
+        fromService:
+          name: aiu-backend
+          type: web
+          envVarKey: DATABASE_URL
+      - key: REDIS_URL
+        fromService:
+          name: aiu-backend
+          type: web
+          envVarKey: REDIS_URL
+      - key: CELERY_BROKER_URL
+        fromService:
+          name: aiu-backend
+          type: web
+          envVarKey: CELERY_BROKER_URL
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          name: aiu-backend
+          type: web
+          envVarKey: CELERY_RESULT_BACKEND
