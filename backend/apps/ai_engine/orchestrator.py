@@ -288,6 +288,31 @@ class AIOrchestrator:
             latency_ms=round(latency_ms, 2),
         )
 
+    def process_guest(self, req: AIRequest) -> AIResponse:
+        """Stateless chat for visitors who are not signed in."""
+        start = time.perf_counter()
+        messages = self.prompt_builder.build(
+            user_message=req.message,
+            recent_messages=[],
+            retrieved_memories=[],
+            user_insights=[],
+            coach_mode=req.coach_mode,
+            user_profile=None,
+            extra_context=req.extra_context,
+        )
+        llm_response = self.llm.complete(messages)
+        latency_ms = (time.perf_counter() - start) * 1000
+
+        return AIResponse(
+            content=llm_response["content"],
+            conversation_id=str(uuid.uuid4()),
+            message_id=str(uuid.uuid4()),
+            tokens_used=llm_response["prompt_tokens"] + llm_response["completion_tokens"],
+            model=llm_response["model"],
+            retrieved_memories=0,
+            latency_ms=round(latency_ms, 2),
+        )
+
     def _get_or_create_conversation(self, req: AIRequest) -> Conversation:
         if req.conversation_id:
             try:
@@ -351,6 +376,24 @@ class AIOrchestrator:
         memory_mgr.append_short_term(str(conversation.id), "user", req.message)
         memory_mgr.append_short_term(str(conversation.id), "assistant", complete_content)
         Conversation.objects.filter(pk=conversation.pk).update(last_message_at=timezone.now())
+
+    def stream_guest(self, req: AIRequest) -> Generator[str, None, None]:
+        """Streaming stateless chat for visitors who are not signed in."""
+        messages = self.prompt_builder.build(
+            user_message=req.message,
+            recent_messages=[],
+            retrieved_memories=[],
+            user_insights=[],
+            coach_mode=req.coach_mode,
+            user_profile=None,
+            extra_context=req.extra_context,
+        )
+        stream = self.llm.complete(messages, stream=True)
+
+        for chunk in stream:
+            delta = getattr(chunk.choices[0].delta, "content", None)
+            if delta:
+                yield delta
 
 
 # Singleton instance (thread-safe, stateless after init)

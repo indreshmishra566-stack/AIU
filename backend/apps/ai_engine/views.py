@@ -9,6 +9,7 @@ import logging
 from django.http import StreamingHttpResponse
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
@@ -60,6 +61,7 @@ class ChatView(APIView):
     Supports both normal and streaming responses.
     """
 
+    permission_classes = [AllowAny]
     throttle_classes = [AIChatThrottle]
 
     @extend_schema(
@@ -71,6 +73,11 @@ class ChatView(APIView):
         serializer = ChatRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
+
+        if not request.user.is_authenticated:
+            if data.get("stream"):
+                return self._stream_guest_response(data)
+            return self._guest_response(data)
 
         # 🔥 STREAM MODE
         if data.get("stream"):
@@ -134,6 +141,57 @@ class ChatView(APIView):
 
             except Exception as exc:
                 logger.exception("Stream error", extra={"user_id": str(request.user.id)})
+                yield f"data: [ERROR] {str(exc)}\n\n"
+
+        response = StreamingHttpResponse(
+            event_stream(),
+            content_type="text/event-stream",
+        )
+        response["Cache-Control"] = "no-cache"
+        response["X-Accel-Buffering"] = "no"
+        return response
+
+    def _guest_response(self, data: dict):
+        ai_req = AIRequest(
+            user_id="guest",
+            message=data["message"],
+            conversation_id=None,
+            coach_mode=data["coach_mode"],
+            extra_context=data.get("context", {}),
+        )
+        ai_resp = orchestrator.process_guest(ai_req)
+        return Response(
+            {
+                "status": "success",
+                "data": {
+                    "content": ai_resp.content,
+                    "conversation_id": ai_resp.conversation_id,
+                    "message_id": ai_resp.message_id,
+                    "tokens_used": ai_resp.tokens_used,
+                    "model": ai_resp.model,
+                    "retrieved_memories": ai_resp.retrieved_memories,
+                    "latency_ms": ai_resp.latency_ms,
+                },
+            }
+        )
+
+    def _stream_guest_response(self, data: dict):
+        ai_req = AIRequest(
+            user_id="guest",
+            message=data["message"],
+            conversation_id=None,
+            coach_mode=data["coach_mode"],
+            stream=True,
+            extra_context=data.get("context", {}),
+        )
+
+        def event_stream():
+            try:
+                for chunk in orchestrator.stream_guest(ai_req):
+                    yield f"data: {str(chunk)}\n\n"
+                yield "data: [DONE]\n\n"
+            except Exception as exc:
+                logger.exception("Guest stream error")
                 yield f"data: [ERROR] {str(exc)}\n\n"
 
         response = StreamingHttpResponse(

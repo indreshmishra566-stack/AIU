@@ -5,7 +5,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import TextareaAutosize from "react-textarea-autosize";
 import toast from "react-hot-toast";
@@ -48,7 +48,7 @@ export default function ChatPage() {
   const { conversationId } = useParams<{ conversationId?: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { user } = useAuthStore();
+  const { user, isAuthenticated, accessToken } = useAuthStore();
 
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
@@ -68,6 +68,7 @@ export default function ChatPage() {
   const { data: convList } = useQuery({
     queryKey: ["conversations"],
     queryFn: () => api.listConversations().then((r) => r.data.results as Conversation[]),
+    enabled: isAuthenticated,
   });
 
   // ── Load existing conversation ─────────────────────────────────────────────
@@ -78,7 +79,7 @@ export default function ChatPage() {
       setMessages(r.data.messages);
       return r.data;
     },
-    enabled: !!currentConvId,
+    enabled: isAuthenticated && !!currentConvId,
   });
 
   // ── Delete conversation ────────────────────────────────────────────────────
@@ -135,19 +136,21 @@ export default function ChatPage() {
         "http://localhost:8000/api/v1"
       ).replace(/\/+$/, "");
 
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (accessToken) {
+        headers.Authorization = `Bearer ${accessToken}`;
+      }
+
       const response = await fetch(
         `${apiBase}/ai/chat/`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("aiu-auth")
-              ? JSON.parse(localStorage.getItem("aiu-auth")!).state.accessToken
-              : ""}`,
-          },
+          headers,
           body: JSON.stringify({
             message: trimmed,
-            conversation_id: currentConvId,
+            conversation_id: isAuthenticated ? currentConvId : undefined,
             coach_mode: coachMode,
             stream: true,
           }),
@@ -182,11 +185,13 @@ export default function ChatPage() {
               };
               setMessages((prev) => [...prev, assistantMsg]);
               setStreamingContent("");
-              if (newConvId && newConvId !== currentConvId) {
+              if (isAuthenticated && newConvId && newConvId !== currentConvId) {
                 setCurrentConvId(newConvId);
                 navigate(`/chat/${newConvId}`, { replace: true });
               }
-              queryClient.invalidateQueries({ queryKey: ["conversations"] });
+              if (isAuthenticated) {
+                queryClient.invalidateQueries({ queryKey: ["conversations"] });
+              }
             } else if (data.startsWith("[ERROR]")) {
               toast.error("AI response failed. Please try again.");
             } else if (data.startsWith("{")) {
@@ -211,7 +216,7 @@ export default function ChatPage() {
       setIsStreaming(false);
       setStreamingContent("");
     }
-  }, [input, isStreaming, currentConvId, coachMode, navigate, queryClient]);
+  }, [accessToken, input, isAuthenticated, isStreaming, currentConvId, coachMode, navigate, queryClient]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -226,6 +231,7 @@ export default function ChatPage() {
     <div className="flex h-full overflow-hidden bg-gray-50 dark:bg-gray-950">
 
       {/* ── Conversation Sidebar ───────────────────────────────────────────── */}
+      {isAuthenticated && (
       <aside className="hidden lg:flex flex-col w-64 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shrink-0">
         <div className="p-4 border-b border-gray-200 dark:border-gray-800">
           <button
@@ -285,6 +291,7 @@ export default function ChatPage() {
           ))}
         </div>
       </aside>
+      )}
 
       {/* ── Main Chat Area ─────────────────────────────────────────────────── */}
       <div className="flex flex-col flex-1 min-w-0">
@@ -303,6 +310,27 @@ export default function ChatPage() {
               </span>
             )}
           </div>
+
+          <div className="flex items-center gap-2">
+            {!isAuthenticated && (
+              <div className="hidden sm:flex items-center gap-2 mr-2">
+                <Link
+                  to="/login"
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-700
+                             dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800
+                             transition-colors"
+                >
+                  Sign in
+                </Link>
+                <Link
+                  to="/register"
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium bg-violet-600
+                             hover:bg-violet-700 text-white transition-colors"
+                >
+                  Sign up
+                </Link>
+              </div>
+            )}
 
           {/* Coach Mode Selector */}
           <div className="relative">
@@ -349,6 +377,7 @@ export default function ChatPage() {
                 </div>
               </>
             )}
+          </div>
           </div>
         </div>
 
@@ -435,7 +464,8 @@ export default function ChatPage() {
             </button>
           </div>
           <p className="text-center text-xs text-gray-400 mt-2">
-            Enter to send · Shift+Enter for new line · Memories are always active
+            Enter to send · Shift+Enter for new line
+            {isAuthenticated ? " · Memories are active" : " · Sign in to save memory"}
           </p>
         </div>
       </div>
@@ -583,7 +613,9 @@ function EmptyState({
       </h3>
       <p className="text-gray-500 text-sm text-center max-w-sm mb-8">
         I'm in <strong>{coachMode.label}</strong> mode — {coachMode.desc.toLowerCase()}.
-        I remember everything you've shared with me.
+        {userName
+          ? " I remember everything you've shared with me."
+          : " You can chat without an account; sign in to save memory."}
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-md">
         {prompts.map((prompt) => (

@@ -67,6 +67,11 @@ export default function App() {
               />
             </Route>
 
+            {/* Public chat routes */}
+            <Route index element={<Navigate to="/chat" replace />} />
+            <Route path="/chat" element={<ChatPage />} />
+            <Route path="/chat/:conversationId" element={<ChatPage />} />
+
             {/* Protected app routes */}
             <Route
               element={
@@ -75,17 +80,14 @@ export default function App() {
                 </ProtectedRoute>
               }
             >
-              <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/chat" element={<ChatPage />} />
-              <Route path="/chat/:conversationId" element={<ChatPage />} />
               <Route path="/goals" element={<GoalsPage />} />
               <Route path="/insights" element={<InsightsPage />} />
               <Route path="/recommendations" element={<RecommendationsPage />} />
               <Route path="/profile" element={<ProfilePage />} />
             </Route>
 
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            <Route path="*" element={<Navigate to="/chat" replace />} />
           </Routes>
         </Suspense>
       </BrowserRouter>
